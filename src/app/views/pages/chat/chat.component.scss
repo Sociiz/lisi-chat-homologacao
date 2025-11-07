@@ -1408,10 +1408,9 @@
   position: absolute;
   z-index: 40;
   top: 72px;
-  left: 0;
+  left: 0 !important;
   background: #fff;
   color: #222;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 1.5px 8px rgba(0,0,0,0.15);
   width: 100%;
   height: calc(100% - 72px);
   padding: 16px;
