@@ -183,7 +183,7 @@ export class LisiComponent implements OnInit, OnDestroy, AfterViewChecked {
     signLanguage: false, // Libras
     darkMode: false, // Tema escuro
     fontSize: 1.0, // Tamanho da fonte (multiplicador: 0.8 a 1.5)
-    autoTts: false, // TTS automático para mensagens da IA
+    autoTts: true, // TTS automático para mensagens da IA
   };
 
   // Getter/Setter para configurações Lisi
