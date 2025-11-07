@@ -50,26 +50,216 @@ p{
   white-space: pre-line;
 }
 
-:root{
-  --primary-color-darker: #1B365C;
-  --primary-color: #0C5DA8;
-  --color-box-send: #fff;
-  --background-box-receive: #7EA1C4;
-  --color-box-receive: #7EA1C4;
+/* ========================================
+   SISTEMA DE DESIGN - VARIÁVEIS CSS GLOBAIS
+   Usado pelos componentes Lisi e outros
+   ======================================== */
+
+/* ========================================
+   SISTEMA DE TEMAS DINÂMICOS - LIGHT (Padrão)
+   ======================================== */
+:root, :root.light {
+  --font-family-primary: "Rawline", sans-serif;
+  --font-family-secondary: "Lato", sans-serif;
+
+  /* Tamanhos de fonte */
+  --text-xs: 10px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 1.8rem;
+
+  /* === ESPAÇAMENTOS === */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+
+  /* === BORDAS E RAIO === */
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 16px;
+  --border-radius-xl: 27px;
+  --border-radius-full: 50%;
+
+  /* === SOMBRAS === */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  /* === ALTURAS E LARGURAS === */
+  --input-height: 54px;
+  --button-height: 54px;
+  --icon-size: 24px;
+  --icon-size-sm: 16px;
+
+  /* === Z-INDEX === */
+  --z-modal: 9999;
+  --z-dropdown: 1000;
+  --z-tooltip: 40;
+
+  /* === CONTROLE DINÂMICO === */
+  --font-scale: 1.0; /* Multiplicador de tamanho da fonte */
+  
+  /* === CORES PRINCIPAIS === */
+  --primary-color: #0C5DA8;           /* primary.main */
+  --primary-color-hover: #1B365C;     /* primary.hover */
+  --primary-color-light: #1D5385;     /* primary.light */
+  --primary-color-darker: #0F3A5C;    /* primary.hover (mais escuro) */
+
+  /* === CORES DE TEXTO === */
+  --text-primary: #1B365C;            /* text.primary */
+  --text-secondary: #313131;          /* text.secondary */
+  --text-white: #FFFFFF;              /* text.white */
+  --text-muted: #A19D9D;              /* text.muted */
+  --text-timestamp: #1B365C;          /* text.timestamp */
+  --text-light: #9CA3AF;              /* gray-400 */
+
+  --link-color: #0C5DA8;
+  --link-color-hover: #1B365C;
+
+  /* === CORES DE FUNDO === */
+  --bg-main: #FFFFFF;                 /* background.main */
+  --bg-chat: #EBEBEB;                 /* background.chat */
+  --bg-disabled: #F2F2F2;             /* background.disabled */
+  --bg-disabled-border: #D0D0D0;      /* background.disabledBorder */
+
+  /* === CORES DE BORDAS === */
+  --border-light: #A19D9D;            /* background.border */
+  --border-gray: #D9D9D9;             /* manter atual */
+  --border-focus: #C2D1FF;            /* manter atual */
+  --border-hover: #A8B8FF;            /* manter atual */
+
+  /* === CORES ESPECÍFICAS DO CHAT === */
+  --color-box-send: #FFFFFF;          /* text.white */
+  --background-box-receive: #7EA1C4;  /* manter atual */
+  --color-box-receive: #7EA1C4;       /* manter atual */
+
+  /* === CORES DE ACENTOS === */
+  --accent-green: #15B457;            /* manter atual */
+  --accent-green-light: #10a37f;      /* manter atual */
+  --accent-red: #ce3131;              /* manter atual */
+  --accent-red-light: #ff4444;        /* manter atual */
+  --accent-blue: #1D5385;             /* manter atual */
+  --accent-blue-hover: #23527c;       /* manter atual */
+  --accent-purple: #6B46C1;            /* manter atual */
+
+  /* === CORES DE UI/ESPECIAIS === */
+  --ui-button-disabled: #A6A6A6;       /* ui.buttonDisabled */
+  --ui-menu-disabled: #A19D9D;         /* ui.menuDisabled */
+  --ui-online: #00FF00;               /* ui.online */
+  --ui-modal-bg: #FFFFFF;             /* ui.modalBackground */
+  --ui-overlay: rgba(0, 0, 0, 0.5);  /* ui.overlay */
+  --ui-toggle-bg: #FFFFFF;            /* ui.toggleBackground */
+  --ui-hover-light: rgba(255, 255, 255, 0.1); /* ui.hoverLight */
+  --ui-hover-dark: rgba(0, 0, 0, 0.1); /* ui.hoverDark */
+
+  /* === CONTROLE DINÂMICO === */
+  --font-scale: 1.0; /* Multiplicador de tamanho da fonte */
+}
+
+/* ========================================
+   SISTEMA DE TEMAS DINÂMICOS - DARK
+   ======================================== */
+:root.dark {
+  /* === CORES PRINCIPAIS === */
+  --primary-color: #0A4A7A;           /* primary.main (dark) */
+  --primary-color-hover: #0F3A5C;     /* primary.hover (dark) */
+  --primary-color-light: #1A5F99;     /* primary.light (dark) */
+  --primary-color-darker: #0F3A5C;    /* primary.hover (mais escuro) */
+
+  /* === CORES DE TEXTO === */
+  --text-primary: #E5E7EB;            /* text.primary (dark) */
+  --text-secondary: #D1D5DB;          /* text.secondary (dark) */
+  --text-white: #FFFFFF;              /* text.white */
+  --text-muted: #9CA3AF;              /* text.muted (dark) */
+  --text-timestamp: #9CA3AF;          /* text.timestamp (dark) */
+  --text-light: #6B7280;              /* gray-500 */
+
+
+  --link-color: #10B981;
+  --link-color-hover: #10B981;
+
+  /* === CORES DE FUNDO === */
+  --bg-main: #111827;                 /* background.main (dark) */
+  --bg-chat: #1F2937;                 /* background.chat (dark) */
+  --bg-disabled: #4B5563;             /* background.disabled (dark) */
+  --bg-disabled-border: #6B7280;      /* background.disabledBorder (dark) */
+
+  /* === CORES DE BORDAS === */
+  --border-light: #374151;            /* background.border (dark) */
+  --border-gray: #4B5563;             /* gray-600 */
+  --border-focus: #C2D1FF;            /* manter atual */
+  --border-hover: #A8B8FF;            /* manter atual */
+
+  /* === CORES ESPECÍFICAS DO CHAT === */
+  --color-box-send: #1F2937;          /* background.chat (dark) */
+  --background-box-receive: #7EA1C4;  /* manter atual */
+  --color-box-receive: #7EA1C4;       /* manter atual */
+
+  /* === CORES DE ACENTOS === */
+  --accent-green: #10B981;            /* emerald-500 */
+  --accent-green-light: #10B981;      /* emerald-500 */
+  --accent-red: #ce3131;              /* manter atual */
+  --accent-red-light: #ff4444;        /* manter atual */
+  --accent-blue: #1D5385;             /* manter atual */
+  --accent-blue-hover: #23527c;       /* manter atual */
+  --accent-purple: #6B46C1;            /* manter atual */
+
+  /* === CORES DE UI/ESPECIAIS === */
+  --ui-button-disabled: #6B7280;       /* ui.buttonDisabled (dark) */
+  --ui-menu-disabled: #6B7280;         /* ui.menuDisabled (dark) */
+  --ui-online: #10B981;               /* ui.online (dark) */
+  --ui-modal-bg: #1F2937;             /* ui.modalBackground (dark) */
+  --ui-overlay: rgba(0, 0, 0, 0.5);  /* ui.overlay */
+  --ui-toggle-bg: #FFFFFF;            /* ui.toggleBackground */
+  --ui-hover-light: rgba(255, 255, 255, 0.1); /* ui.hoverLight */
+  --ui-hover-dark: rgba(0, 0, 0, 0.1); /* ui.hoverDark */
+
+  /* === NOTAS DE USO === */
+  /* Use var(--nome-variavel) para acessar qualquer variável */
+  /* Exemplo: color: var(--primary-color); */
+  /* Exemplo: background: var(--bg-main); */
+  /* Exemplo: font-size: var(--text-lg); */
+  /* Exemplo: padding: var(--spacing-4); */
+
+  /* === SISTEMA DE TEMAS DINÂMICOS === */
+  /* Para alternar temas, adicione/remova classe no <html> ou <body>: */
+  /* document.documentElement.classList.add('dark'); */
+  /* document.documentElement.classList.remove('dark'); */
+  /* As variáveis mudam automaticamente com :root.dark */
+
+  /* === CONTROLE DINÂMICO DE FONTE === */
+  /* Use --font-scale para controlar tamanho da fonte: */
+  /* document.documentElement.style.setProperty('--font-scale', '1.2'); */
+  /* Valores: 0.8 (80%) até 1.5 (150%) */
+
+  /* === CONFIGURAÇÕES DO COMPONENTE LISI === */
+  /* autoTts: TTS automático para mensagens da IA */
+  /* tts: Leitura de texto habilitada */
+  /* stt: Fala para texto habilitada */
+  /* darkMode: Tema escuro */
+  /* fontSize: Tamanho da fonte (0.8-1.5) */
 
 }
 
 a.link-4 {
-  color: #1D5385;
-  text-decoration: underline;
+  color: var(--link-color) !important;
+  text-decoration: underline !important;
   transition: color 0.2s ease;
 
   &:hover {
-    color: #23527c;
+    color: var(--link-color-hover) !important;
     text-decoration: none;
   }
 
   &:visited {
-    color: #6B46C1;
+    color: var(--link-color) !important;
   }
 }

@@ -7,11 +7,7 @@ const routes: Routes = [
   // { path:'auth', loadChildren: () => import('./views/pages/auth/auth.module').then(m => m.AuthModule) },
   {
     path: '',
-    loadChildren: () => import('./views/pages/chat/chat.module').then(m => m.ChatModule)
-  },
-  {
-    path: 'chat-c',
-    loadChildren: () => import('./views/pages/chat/chat.module').then(m => m.ChatModule)
+    loadChildren: () => import('./views/pages/lisi/lisi.module').then(m => m.LisiModule)
   },
   /*
   {

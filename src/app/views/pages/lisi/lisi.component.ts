@@ -1,16 +1,26 @@
+// Angular Core
 import {
   Component,
   OnInit,
   OnDestroy,
+  AfterViewChecked,
   ViewChild,
   ElementRef,
-  AfterViewChecked,
   HostListener,
 } from "@angular/core";
+
+// Angular Platform
 import { ActivatedRoute } from "@angular/router";
 import { DomSanitizer, SafeHtml, SafeUrl } from "@angular/platform-browser";
+
+// RxJS
 import { finalize, firstValueFrom, Subscription } from "rxjs";
+
+// Third-party
 import { v4 as uuidv4 } from "uuid";
+import Swal from "sweetalert2";
+
+// Services
 import { ChatSocketService } from "src/app/services/chat-socket.service";
 import { NotificacaoService } from "src/app/services/notificacao.service";
 import { RatingService } from "src/app/services/rating.service";
@@ -18,34 +28,46 @@ import { EmojiService } from "src/app/services/emoji.service";
 import { AtendimentoHumanizadoService } from "src/app/services/atendimento-humanizado.service";
 import { SpeechSynthesisService } from "src/app/services/speechSynthesis.service";
 import { SpeechToTextService } from "src/app/services/speechToText.service";
-import Swal from "sweetalert2";
 
 @Component({
-  selector: "app-chat",
-  templateUrl: "./chat.component.html",
-  styleUrls: ["./chat.component.scss"],
+  selector: "app-lisi",
+  templateUrl: "./lisi.component.html",
+  styleUrls: ["./lisi.component.scss"],
 })
-export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
+export class LisiComponent implements OnInit, OnDestroy, AfterViewChecked {
+  // View References
   @ViewChild("scrollRef") scrollRef?: ElementRef;
 
-  // --- Propriedades de Estado do Chat ---
+  // ========================================
+  // PROPRIEDADES PÚBLICAS - Estado do Chat
+  // ========================================
+
+  // Dados Principais do Chat
   salaPrincipal: any = {};
   conversaSala: any[] = [];
   mensagem = "";
   protocolo: string | null = null;
-  clientKey: string = "C7VY7HCVF47H3F4";
+  clientKey: string = "49fa27aab4f70b8eaacf"; // Fixo para Lisi
   cacheBuster: number = Date.now();
   userId: string | null = null;
   atendenteId: string | null = null;
   posicao: number | null = null;
+  hasUserInteracted: boolean = false; // Controla se o usuário já interagiu
 
-  // --- Flags de Controle de UI ---
+  // ========================================
+  // PROPRIEDADES PÚBLICAS - Controle de UI
+  // ========================================
+
+  // Estados de Carregamento
   estaCarregandoPagina = true;
   estaCarregandoSala = false;
   estaEsperandoAtendimento = false;
   isSendingMessage = false;
   isInputBlocked = false;
   isSubmittingRating = false;
+  isWaitingForResponse = false;
+
+  // Estados do Chat
   chatEnd = false;
   atendimentoHumanoAtivo = false;
   socketConfigurado = false;
@@ -67,9 +89,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     "text/plain",
   ];
   readonly ALLOWED_VIDEO_MIME_TYPES: string[] = ["video/mp4"];
-  downloadingFiles: { [key: string]: boolean } = {};
 
-  // Upload state
+  // ========================================
+  // PROPRIEDADES PÚBLICAS - Upload de Arquivos
+  // ========================================
+
+  // Estados de Upload
   uploadStepConfirm: boolean = false;
   selectedUploadFile: File | null = null;
   viewerOpen: boolean = false;
@@ -86,34 +111,82 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   stepStatusSolic: "idle" | "loading" | "success" | "error" = "idle";
   stepStatusUpload: "idle" | "loading" | "success" | "error" = "idle";
   stepStatusSend: "idle" | "loading" | "success" | "error" = "idle";
-  isWaitingForResponse: boolean = false;
   showActions: boolean = false;
-  private fileUrlCache: { [key: string]: { url: string; expires: number } } =
-    {};
+  downloadingFiles: { [key: string]: boolean } = {};
 
-  // --- Avaliação do Atendimento ---
+  // ========================================
+  // PROPRIEDADES PÚBLICAS - Avaliação
+  // ========================================
+
   rating = 0;
   likeDislike = false;
   avaliAtend = false;
 
-  // --- Propriedades Privadas ---
+  // ========================================
+  // PROPRIEDADES PÚBLICAS - STT (Speech-to-Text)
+  // ========================================
+
+  // Estados de Gravação STT
+  isRecording: boolean = false;
+  mediaRecorder: MediaRecorder | null = null;
+  recordedChunks: Blob[] = [];
+  recognition: any = null;
+  sttTranscript: string = "";
+
+  // ========================================
+  // PROPRIEDADES PÚBLICAS - Configurações Lisi
+  // ========================================
+
+  lisiConfigPanelOpen: boolean = false;
+
+  // ========================================
+  // PROPRIEDADES PRIVADAS - STT
+  // ========================================
+
+  private sttErrorOccurred: boolean = false;
+  private sttInterim: string = "";
+  // VAD (Voice Activity Detection)
+  private audioCtx: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private vadInterval: any = null;
+  private voiceDetected: boolean = false;
+  private sttInterimSub?: Subscription;
+  private sttFinalSub?: Subscription;
+
+  // ========================================
+  // PROPRIEDADES PRIVADAS - Gerais
+  // ========================================
+
   private token: string = "";
   private hash: string = "";
   private lastConversaLength = 0;
   private ratingDisabled: { [key: string]: boolean } = {};
   private ratingDisableTimers: { [key: string]: any } = {};
   private submittedRatings: { [key: string]: "like" | "dislike" } = {};
+  private fileUrlCache: { [key: string]: { url: string; expires: number } } =
+    {};
 
-  // === Estado do Painel de Configurações Lisi ===
-  lisiConfigPanelOpen: boolean = false;
+  // ========================================
+  // CONSTANTES PRIVADAS
+  // ========================================
+
+  private readonly LISI_CONFIG_KEY = "chat:lisiConfig";
+  private readonly THEME_STORAGE_KEY = "theme";
+
+  // ========================================
+  // CONFIGURAÇÕES PRIVADAS (com getter/setter)
+  // ========================================
+
   private _lisiConfig = {
-    tts: false,              // Leitura de texto
-    stt: false,              // Fala para texto
-    signLanguage: false,     // Libras
-    darkMode: false,         // Tema escuro
-    largeFont: false         // Fonte grande
+    tts: true, // Leitura de texto
+    stt: true, // Fala para texto
+    signLanguage: false, // Libras
+    darkMode: false, // Tema escuro
+    fontSize: 1.0, // Tamanho da fonte (multiplicador: 0.8 a 1.5)
+    autoTts: false, // TTS automático para mensagens da IA
   };
 
+  // Getter/Setter para configurações Lisi
   get lisiConfig() {
     return this._lisiConfig;
   }
@@ -123,118 +196,147 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.saveLisiConfig();
   }
 
-  // === STT (Speech-to-Text) State ===
-  isRecording: boolean = false;
-  mediaRecorder: MediaRecorder | null = null;
-  recordedChunks: Blob[] = [];
-  recognition: any = null;
-  sttTranscript: string = '';
-  private sttErrorOccurred: boolean = false;
-  private sttInterim: string = '';
-  // VAD (Voice Activity Detection)
-  private audioCtx: (AudioContext | null) = null;
-  private analyser: (AnalyserNode | null) = null;
-  private vadInterval: any = null;
-  private voiceDetected: boolean = false;
-  private sttInterimSub?: Subscription;
-  private sttFinalSub?: Subscription;
-
-  private readonly LISI_CONFIG_KEY = 'chat:lisiConfig';
-  private readonly THEME_STORAGE_KEY = 'theme';
+  // ========================================
+  // MÉTODOS PÚBLICOS - Configurações Lisi
+  // ========================================
 
   toggleLisiConfigPanel() {
     this.lisiConfigPanelOpen = !this.lisiConfigPanelOpen;
   }
 
-  // === Método para atualizar configurações e salvar no localStorage ===
-  updateLisiConfig(key: keyof typeof this.lisiConfig, value: boolean) {
-    this._lisiConfig[key] = value;
+  updateLisiConfig(key: keyof typeof this.lisiConfig, value: boolean | number) {
+    this._lisiConfig[key] = value as never;
     this.saveLisiConfig();
-    if (key === 'darkMode') {
-      this.applyThemeClass(value ? 'dark' : 'light');
+    if (key === "darkMode") {
+      this.applyThemeClass(value ? "dark" : "light");
+    }
+    if (key === "fontSize") {
+      this.applyFontSize(value as number);
     }
   }
 
-  // === Métodos de Configuração ===
+  // ========================================
+  // MÉTODOS PRIVADOS - Configuração e Persistência
+  // ========================================
+
   private loadLisiConfig() {
     try {
       let saved = localStorage.getItem(this.LISI_CONFIG_KEY);
       if (!saved) {
         // Fallback para sessionStorage se localStorage não estiver disponível (ex.: restrições de 3rd-party)
-        try { saved = sessionStorage.getItem(this.LISI_CONFIG_KEY) || saved; } catch {}
+        try {
+          saved = sessionStorage.getItem(this.LISI_CONFIG_KEY) || saved;
+        } catch {}
       }
       if (saved) {
         this.lisiConfig = { ...this.lisiConfig, ...JSON.parse(saved) };
       }
     } catch (e) {
-      console.warn('Erro ao carregar configurações Lisi:', e);
+      console.warn("Erro ao carregar configurações Lisi:", e);
     }
   }
 
   private saveLisiConfig() {
     try {
-      localStorage.setItem(this.LISI_CONFIG_KEY, JSON.stringify(this.lisiConfig));
+      localStorage.setItem(
+        this.LISI_CONFIG_KEY,
+        JSON.stringify(this.lisiConfig)
+      );
     } catch (e) {
-      console.warn('Erro ao salvar configurações Lisi:', e);
+      console.warn("Erro ao salvar configurações Lisi:", e);
       // Fallback: tenta persistir em sessionStorage
-      try { sessionStorage.setItem(this.LISI_CONFIG_KEY, JSON.stringify(this.lisiConfig)); } catch {}
+      try {
+        sessionStorage.setItem(
+          this.LISI_CONFIG_KEY,
+          JSON.stringify(this.lisiConfig)
+        );
+      } catch {}
     }
   }
 
   // === Tema (Light/Dark) ===
-  private applyThemeClass(mode: 'light' | 'dark'): void {
+  // Sistema de temas dinâmicos baseado em variáveis CSS
+  // Quando "dark" é adicionado ao :root, todas as variáveis mudam automaticamente
+  private applyThemeClass(mode: "light" | "dark"): void {
     try {
       const body = document.body;
       const root = document.documentElement;
-      body.classList.remove('light', 'dark');
-      root.classList.remove('light', 'dark');
+      body.classList.remove("light", "dark");
+      root.classList.remove("light", "dark");
       body.classList.add(mode);
       root.classList.add(mode);
-      try { localStorage.setItem(this.THEME_STORAGE_KEY, mode); } catch {}
-      try { sessionStorage.setItem(this.THEME_STORAGE_KEY, mode); } catch {}
+      try {
+        localStorage.setItem(this.THEME_STORAGE_KEY, mode);
+      } catch {}
+      try {
+        sessionStorage.setItem(this.THEME_STORAGE_KEY, mode);
+      } catch {}
+    } catch {}
+  }
+
+  // === Tamanho da Fonte ===
+  // Controla dinamicamente o tamanho da fonte através de variável CSS
+  private applyFontSize(scale: number): void {
+    try {
+      const root = document.documentElement;
+      root.style.setProperty("--font-scale", scale.toString());
     } catch {}
   }
 
   private initThemeFromStorage(): void {
     try {
       let stored = null as string | null;
-      try { stored = localStorage.getItem(this.THEME_STORAGE_KEY); } catch {}
+      try {
+        stored = localStorage.getItem(this.THEME_STORAGE_KEY);
+      } catch {}
       if (!stored) {
-        try { stored = sessionStorage.getItem(this.THEME_STORAGE_KEY); } catch {}
+        try {
+          stored = sessionStorage.getItem(this.THEME_STORAGE_KEY);
+        } catch {}
       }
       let dark = this.lisiConfig.darkMode;
-      if (stored === 'dark') dark = true;
-      if (stored === 'light') dark = false;
+      if (stored === "dark") dark = true;
+      if (stored === "light") dark = false;
       this._lisiConfig.darkMode = dark;
       this.saveLisiConfig();
-      this.applyThemeClass(dark ? 'dark' : 'light');
+      this.applyThemeClass(dark ? "dark" : "light");
+      this.applyFontSize(this.lisiConfig.fontSize);
     } catch {
-      this.applyThemeClass(this.lisiConfig.darkMode ? 'dark' : 'light');
+      this.applyThemeClass(this.lisiConfig.darkMode ? "dark" : "light");
+      this.applyFontSize(this.lisiConfig.fontSize);
     }
   }
 
-  // === STT Methods ===
+  // ========================================
+  // MÉTODOS PÚBLICOS - STT (Speech-to-Text)
+  // ========================================
+
   async startSttRecording() {
-    console.log('🎙️ [STT] Iniciando gravação de voz...');
+    console.log("🎙️ [STT] Iniciando gravação de voz...");
     if (!this.lisiConfig.stt) {
-      console.log('🎙️ [STT] STT desativado nas configurações');
+      console.log("🎙️ [STT] STT desativado nas configurações");
       return;
     }
     try {
       await this.speechToTextService.start();
       this.isRecording = true;
-      console.log('🎙️ [STT] Gravação iniciada');
+      console.log("🎙️ [STT] Gravação iniciada");
     } catch (e) {
-      console.error('Erro ao iniciar gravação STT:', e);
+      console.error("Erro ao iniciar gravação STT:", e);
       this.isRecording = false;
     }
   }
 
   async stopSttRecording() {
-    console.log('🎙️ [STT] Parando gravação...');
+    console.log("🎙️ [STT] Parando gravação...");
     this.isRecording = false;
     const res = await this.speechToTextService.stop();
-    console.log('🎙️ [STT] Gravação parada. Transcrição final:', (res.transcript || '').trim(), '| Parcial acumulada:', (res.interimTranscript || '').trim());
+    console.log(
+      "🎙️ [STT] Gravação parada. Transcrição final:",
+      (res.transcript || "").trim(),
+      "| Parcial acumulada:",
+      (res.interimTranscript || "").trim()
+    );
 
     if (res.dataUrl) {
       // Salva em sessionStorage (independente de ter transcrição)
@@ -244,15 +346,15 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
           id: uuidv4(),
           ts: new Date().toISOString(),
           dataUrl: res.dataUrl,
-          mime: res.mime || 'audio/webm',
-          transcript: (res.transcript || '').trim(),
+          mime: res.mime || "audio/webm",
+          transcript: (res.transcript || "").trim(),
           hasVoice: !!res.hasVoice,
         };
         voiceMsgs.push(voiceMsg);
-        sessionStorage.setItem('chat:voiceMsgs', JSON.stringify(voiceMsgs));
-        console.log('🎙️ [STT] Mensagem de voz salva no sessionStorage');
+        sessionStorage.setItem("chat:voiceMsgs", JSON.stringify(voiceMsgs));
+        console.log("🎙️ [STT] Mensagem de voz salva no sessionStorage");
       } catch (e) {
-        console.warn('🎙️ [STT] Erro ao salvar mensagem de voz:', e);
+        console.warn("🎙️ [STT] Erro ao salvar mensagem de voz:", e);
       }
 
       // Cria balão de voz
@@ -269,24 +371,32 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         usuId: this.userId,
         para: this.salaPrincipal.usuId,
         audioUrl: res.dataUrl,
-        audioMimeType: res.mime || 'audio/webm',
-        transcript: (res.transcript || '').trim(),
+        audioMimeType: res.mime || "audio/webm",
+        transcript: (res.transcript || "").trim(),
         hasVoice: !!res.hasVoice,
       } as any;
 
       this.conversaSala.push(voiceMessage);
       this.roleConversaParaFinal();
       this.updateWaitingForResponse();
-      console.log('🎙️ [STT] Balão de voz criado e exibido na conversa. Status:', voiceMessage.olmStatus);
+      console.log(
+        "🎙️ [STT] Balão de voz criado e exibido na conversa. Status:",
+        voiceMessage.olmStatus
+      );
 
-      const transcript = (res.transcript || res.interimTranscript || '').trim();
+      const transcript = (res.transcript || res.interimTranscript || "").trim();
       if (transcript) {
-        console.log('📤 [STT->MSG] Transcrição disponível. Enviando ao socket sem criar novo balão de texto...', transcript);
+        console.log(
+          "📤 [STT->MSG] Transcrição disponível. Enviando ao socket sem criar novo balão de texto...",
+          transcript
+        );
+        this.hasUserInteracted = true; // Marca interação via voz
         const { socketPayload } = this.criarPayloadMensagem(transcript);
         this.enviarMensagemAoSocket(socketPayload);
       } else {
         const fallback = "Não entendi, poderia repetir novamente?";
-        console.log('🤖 [Lisi] Sem transcrição. Mostrando fallback:', fallback);
+        console.log("🤖 [Lisi] Sem transcrição. Mostrando fallback:", fallback);
+        this.hasUserInteracted = true; // Marca interação via voz (mesmo sem transcrição)
         const lisiMessage = {
           olmId: uuidv4(),
           olmStatus: "A",
@@ -309,12 +419,15 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   toggleSttRecording() {
-    console.log('🎙️ [TOGGLE] Botão de STT clicado. Estado atual:', this.isRecording ? 'GRAVANDO' : 'PARADO');
+    console.log(
+      "🎙️ [TOGGLE] Botão de STT clicado. Estado atual:",
+      this.isRecording ? "GRAVANDO" : "PARADO"
+    );
     if (this.isRecording) {
-      console.log('🎙️ [TOGGLE] Parando gravação...');
+      console.log("🎙️ [TOGGLE] Parando gravação...");
       this.stopSttRecording();
     } else {
-      console.log('🎙️ [TOGGLE] Iniciando gravação...');
+      console.log("🎙️ [TOGGLE] Iniciando gravação...");
       this.startSttRecording();
     }
   }
@@ -331,10 +444,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   private getVoiceMessages(): any[] {
     try {
-      const stored = sessionStorage.getItem('chat:voiceMsgs');
+      const stored = sessionStorage.getItem("chat:voiceMsgs");
       return stored ? JSON.parse(stored) : [];
     } catch (e) {
-      console.warn('Erro ao carregar mensagens de voz:', e);
+      console.warn("Erro ao carregar mensagens de voz:", e);
       return [];
     }
   }
@@ -343,7 +456,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     // Retorna a última mensagem de voz da conversa (mais recente)
     for (let i = this.conversaSala.length - 1; i >= 0; i--) {
       const msg = this.conversaSala[i];
-      if (msg.audioUrl && msg.audioMimeType && msg.olmTipo === 'US') {
+      if (msg.audioUrl && msg.audioMimeType && msg.olmTipo === "US") {
         return msg;
       }
     }
@@ -362,17 +475,18 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
       let reconciliados = 0;
       for (const v of list) {
-        const transcript = String(v?.transcript || '').trim();
-        const dataUrl = String(v?.dataUrl || '');
-        const mime = String(v?.mime || 'audio/webm');
+        const transcript = String(v?.transcript || "").trim();
+        const dataUrl = String(v?.dataUrl || "");
+        const mime = String(v?.mime || "audio/webm");
         if (!dataUrl) continue;
 
         if (transcript) {
           const sanitized = this.sanitizeInputField(transcript);
-          const idx = this.conversaSala.findIndex((m: any) =>
-            m?.olmTipo === 'US' &&
-            !m?.audioUrl &&
-            String(m?.olmMensagemCliente || '').trim() === sanitized
+          const idx = this.conversaSala.findIndex(
+            (m: any) =>
+              m?.olmTipo === "US" &&
+              !m?.audioUrl &&
+              String(m?.olmMensagemCliente || "").trim() === sanitized
           );
           if (idx !== -1) {
             this.conversaSala[idx] = {
@@ -389,14 +503,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         // Não encontrou mensagem a substituir: cria um balão de voz ao final
         const voiceMsg = {
           olmId: uuidv4(),
-          olmStatus: 'A',
+          olmStatus: "A",
           olmDataHoraEnvio: new Date().toISOString(),
           olmDatahoraRegistro: new Date().toISOString(),
           olmProtocoloConversa: this.protocolo,
           afiCodigo: this.salaPrincipal.afiCodigo,
-          olmMensagemCliente: '',
-          olmRespostaIa: '',
-          olmTipo: 'US',
+          olmMensagemCliente: "",
+          olmRespostaIa: "",
+          olmTipo: "US",
           usuId: this.userId,
           para: this.salaPrincipal.usuId,
           audioUrl: dataUrl,
@@ -411,15 +525,17 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.updateWaitingForResponse();
       }
     } catch (e) {
-      console.warn('Erro ao reconciliar áudios da sessão:', e);
+      console.warn("Erro ao reconciliar áudios da sessão:", e);
     }
   }
 
   private replaceVoiceMessageWithText(voiceMessage: any, text: string): void {
-    console.log('🔄 [VOICE] Substituindo mensagem de voz por texto:', text);
+    console.log("🔄 [VOICE] Substituindo mensagem de voz por texto:", text);
     // Substitui a mensagem de voz por uma mensagem de texto
-    const index = this.conversaSala.findIndex(msg => msg.olmId === voiceMessage.olmId);
-    console.log('🔄 [VOICE] Índice da mensagem de voz:', index);
+    const index = this.conversaSala.findIndex(
+      (msg) => msg.olmId === voiceMessage.olmId
+    );
+    console.log("🔄 [VOICE] Índice da mensagem de voz:", index);
     if (index !== -1) {
       const textMessage = {
         olmId: uuidv4(),
@@ -437,17 +553,20 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       };
 
       // Substitui a mensagem de voz pela mensagem de texto
-      console.log('🔄 [VOICE] Substituindo mensagem de voz por texto na posição', index);
+      console.log(
+        "🔄 [VOICE] Substituindo mensagem de voz por texto na posição",
+        index
+      );
       this.conversaSala[index] = textMessage;
       this.updateWaitingForResponse();
 
       // Envia a mensagem de texto para o socket
-      console.log('🔄 [VOICE] Criando payload para envio ao socket');
+      console.log("🔄 [VOICE] Criando payload para envio ao socket");
       const { socketPayload } = this.criarPayloadMensagem(text);
       this.enviarMensagemAoSocket(socketPayload);
-      console.log('🔄 [VOICE] Mensagem de texto enviada ao socket');
+      console.log("🔄 [VOICE] Mensagem de texto enviada ao socket");
     } else {
-      console.log('🔄 [VOICE] Mensagem de voz não encontrada para substituir');
+      console.log("🔄 [VOICE] Mensagem de voz não encontrada para substituir");
     }
   }
 
@@ -455,10 +574,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     const last = this.getLastVoiceMessage();
     if (!last) return false;
     // Considera pendente apenas quando há transcrição e ainda não recebemos ACK (status P)
-    const hasTranscript = !!(last.transcript && String(last.transcript).trim().length > 0);
-    return hasTranscript && last.olmStatus === 'P';
+    const hasTranscript = !!(
+      last.transcript && String(last.transcript).trim().length > 0
+    );
+    return hasTranscript && last.olmStatus === "P";
   }
-
 
   constructor(
     private route: ActivatedRoute,
@@ -472,6 +592,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     private speechToTextService: SpeechToTextService
   ) {}
 
+  // ========================================
+  // MÉTODOS DO CICLO DE VIDA - Angular Lifecycle
+  // ========================================
+
   /**
    * Método de ciclo de vida do Angular. Inicia a configuração do chat.
    */
@@ -482,10 +606,14 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     // this.configurarListenerCliqueFora();
     // Subs para debug de parciais/finais do STT
     this.sttInterimSub = this.speechToTextService.interim$.subscribe((t) => {
-      try { console.log('🎙️ [STT] Transcrição parcial:', t); } catch {}
+      try {
+        console.log("🎙️ [STT] Transcrição parcial:", t);
+      } catch {}
     });
     this.sttFinalSub = this.speechToTextService.final$.subscribe((t) => {
-      try { console.log('🎙️ [STT] Transcrição final acumulada:', t); } catch {}
+      try {
+        console.log("🎙️ [STT] Transcrição final acumulada:", t);
+      } catch {}
     });
   }
 
@@ -502,8 +630,12 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     if (this.isRecording) {
       this.stopSttRecording();
     }
-    try { this.sttInterimSub?.unsubscribe(); } catch {}
-    try { this.sttFinalSub?.unsubscribe(); } catch {}
+    try {
+      this.sttInterimSub?.unsubscribe();
+    } catch {}
+    try {
+      this.sttFinalSub?.unsubscribe();
+    } catch {}
   }
 
   /**
@@ -516,46 +648,25 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  // --- MÉTODOS DE INICIALIZAÇÃO E CONFIGURAÇÃO ---
+  // ========================================
+  // MÉTODOS PRIVADOS - Inicialização e Configuração
+  // ========================================
 
   /**
    * Orquestra a inicialização do componente, configurando listeners e iniciando a sessão do chat.
    */
   private inicializarChat(): void {
-    this.clientKey =
-      this.route.snapshot.queryParamMap.get("clientKey") || "C7VY7HCVF47H3F4";
+    this.clientKey = "49fa27aab4f70b8eaacf";
     this.isSouceVisible =
       this.route.snapshot.queryParamMap.get("source") === "true";
     this.token = this.route.snapshot.queryParamMap.get("token") || "";
     this.hash = this.route.snapshot.queryParamMap.get("hash") || "";
 
     // Configurar cores baseado no clientKey
-    this.configurarCoresPorClientKey();
+    // this.configurarCoresPorClientKey();
 
-    // MarIA
-    if (this.clientKey === "C7VY7HCVF47H3F4") {
-      this.salaPrincipal.afiCodigo = "SOCZA001";
-    }
-
-    // Lisi
-    if (this.clientKey === "49fa27aab4f70b8eaacf") {
-      this.salaPrincipal.afiCodigo = "DETAL001";
-    }
-
-    // Ana Clara 1  
-    if (this.clientKey === "5237XCA0IU2VAR2D12BN") {
-      this.salaPrincipal.afiCodigo = "IFCMT001";
-    }
-
-    // Ana Clara 2
-    if (this.clientKey === "938VF4YU8HVU8HVF4U8H") {
-      this.salaPrincipal.afiCodigo = "IFCMT001";
-    }
-
-    // Barto
-    if (this.clientKey === "954GBBG4NY73VF478VB5") {
-      this.salaPrincipal.afiCodigo = "MANZO001";
-    }
+    // Componente exclusivo para Lisi
+    this.salaPrincipal.afiCodigo = "DETAL001";
 
     this.configurarListenersSocket();
     this.configurarListenersReconexao();
@@ -570,28 +681,20 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   /**
-   * Configura as variáveis CSS de cores baseado no clientKey.
+   * Configura as variáveis CSS de cores para Lisi.
    */
-  private configurarCoresPorClientKey(): void {
-    const root = document.documentElement;
+  // private configurarCoresPorClientKey(): void {
+  //   const root = document.documentElement;
 
-    if (this.clientKey === "5237XCA0IU2VAR2D12BN" || this.clientKey === "938VF4YU8HVU8HVF4U8H") {
-      // Cores verdes para IFCMT001
-      root.style.setProperty('--primary-color-darker', '#18341C');
-      root.style.setProperty('--primary-color', '#1C5F27');
-      root.style.setProperty('--background-box-receive', '#70B37B');
-      root.style.setProperty('--color-box-receive', '#70B37B');
-    } else {
-      // Cores padrão azuis para outros clientKeys (C7VY7HCVF47H3F4 e 49fa27aab4f70b8eaacf)
-      root.style.setProperty('--primary-color-darker', '#1B365C');
-      root.style.setProperty('--primary-color', '#0C5DA8');
-      root.style.setProperty('--background-box-receive', '#7EA1C4');
-      root.style.setProperty('--color-box-receive', '#7EA1C4');
-    }
+  //   // Cores padrão azuis para Lisi
+  //   root.style.setProperty("--primary-color-darker", "#1B365C");
+  //   root.style.setProperty("--primary-color", "#0C5DA8");
+  //   root.style.setProperty("--background-box-receive", "#7EA1C4");
+  //   root.style.setProperty("--color-box-receive", "#7EA1C4");
 
-    // Mantém a cor do box de envio sempre branca
-    root.style.setProperty('--color-box-send', '#fff');
-  }
+  //   // Mantém a cor do box de envio sempre branca
+  //   root.style.setProperty("--color-box-send", "#fff");
+  // }
 
   /**
    * Configura todos os listeners para eventos recebidos via WebSocket.
@@ -896,7 +999,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
 
-  // --- PROCESSAMENTO DE MENSAGENS (RECEBIDAS E ENVIADAS) ---
+  // ========================================
+  // MÉTODOS PRIVADOS - Processamento de Mensagens
+  // ========================================
 
   /**
    * Processa uma mensagem recebida do WebSocket.
@@ -938,6 +1043,29 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       this.notificacaoService.notificar("Mensagem recebida", msg.olmMensagemIa);
     }
 
+    // TTS automático para mensagens da IA (Lisi) - apenas após interação do usuário
+    // Inclui respostas para: mensagens digitadas, mensagens transcritas (STT),
+    // seleções de botões, uploads de arquivos, interações por voz
+    // console.log('🎵 [TTS AUTO] Verificando condições:', {
+    //   tipo: msg.olmTipo,
+    //   isIA: msg.olmTipo === "IA",
+    //   isAT: msg.olmTipo === "AT",
+    //   autoTts: this.lisiConfig.autoTts,
+    //   tts: this.lisiConfig.tts,
+    //   hasInteracted: this.hasUserInteracted,
+    //   resposta: msg.olmRespostaIa?.substring(0, 30)
+    // });
+
+    if ((msg.olmTipo === "IA" || msg.olmTipo === "AT" || msg.olmTipo === "BT") && this.lisiConfig.autoTts && this.lisiConfig.tts && this.hasUserInteracted) {
+      console.log('🎵 [TTS AUTO] ✅ Condições atendidas - ativando TTS automático');
+      setTimeout(() => {
+        console.log('🎵 [TTS AUTO] Executando toggleTtsMessage...');
+        this.speechSynthesisService.toggleTtsMessage(msg, this.lisiConfig.tts, this.clientKey);
+      }, 1000); // Delay ainda menor para resposta mais rápida
+    } else {
+      console.log('🎵 [TTS AUTO] ❌ Condições NÃO atendidas');
+    }
+
     this.roleConversaUmPoucoAbaixo();
   }
 
@@ -957,22 +1085,28 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
       // Evita duplicar eco de mensagens do próprio usuário: se vier 'US' do socket
       // e já existe uma mensagem local pendente ('P') com o mesmo texto, apenas atualiza
       if (
-        msg?.olmTipo === 'US' &&
-        (msg?.olmMensagemCliente || '').trim().length > 0
+        msg?.olmTipo === "US" &&
+        (msg?.olmMensagemCliente || "").trim().length > 0
       ) {
         // 1) Caso: reconciliar com texto digitado pendente
-        const sameTextIdx = [...this.conversaSala].reverse().findIndex((m: any) =>
-          m?.olmTipo === 'US' &&
-          m?.olmStatus === 'P' &&
-          (m?.olmMensagemCliente || '').trim() === (msg?.olmMensagemCliente || '').trim()
-        );
+        const sameTextIdx = [...this.conversaSala]
+          .reverse()
+          .findIndex(
+            (m: any) =>
+              m?.olmTipo === "US" &&
+              m?.olmStatus === "P" &&
+              (m?.olmMensagemCliente || "").trim() ===
+                (msg?.olmMensagemCliente || "").trim()
+          );
         if (sameTextIdx !== -1) {
           const realIdx = this.conversaSala.length - 1 - sameTextIdx;
           this.conversaSala[realIdx] = {
             ...this.conversaSala[realIdx],
             olmId: msg.olmId,
-            olmStatus: 'A',
-            olmDataHoraEnvio: msg.olmDataHoraEnvio || this.conversaSala[realIdx].olmDataHoraEnvio,
+            olmStatus: "A",
+            olmDataHoraEnvio:
+              msg.olmDataHoraEnvio ||
+              this.conversaSala[realIdx].olmDataHoraEnvio,
           };
           this.updateWaitingForResponse();
           return;
@@ -980,17 +1114,21 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
         // 2) Caso: a mensagem é eco do texto enviado pela transcrição de voz
         // Procura o último balão de voz do usuário com a mesma transcrição e reconcilia status
-        const sameTranscriptIdx = [...this.conversaSala].reverse().findIndex((m: any) =>
-          m?.olmTipo === 'US' &&
-          m?.audioUrl &&
-          (m?.transcript || '').trim() === (msg?.olmMensagemCliente || '').trim()
-        );
+        const sameTranscriptIdx = [...this.conversaSala]
+          .reverse()
+          .findIndex(
+            (m: any) =>
+              m?.olmTipo === "US" &&
+              m?.audioUrl &&
+              (m?.transcript || "").trim() ===
+                (msg?.olmMensagemCliente || "").trim()
+          );
         if (sameTranscriptIdx !== -1) {
           const realIdx = this.conversaSala.length - 1 - sameTranscriptIdx;
           // Atualiza status do balão de voz para "A" e não cria balão de texto
           this.conversaSala[realIdx] = {
             ...this.conversaSala[realIdx],
-            olmStatus: 'A',
+            olmStatus: "A",
           };
           this.updateWaitingForResponse();
           return;
@@ -1013,36 +1151,48 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     this.updateWaitingForResponse();
   }
 
+  // ========================================
+  // MÉTODOS PÚBLICOS - Principais Funcionalidades do Chat
+  // ========================================
+
   /**
    * Envia a mensagem digitada pelo usuário.
    */
   async enviarMensagem(): Promise<void> {
-    console.log('📤 [MSG] Iniciando envio de mensagem...');
+    console.log("📤 [MSG] Iniciando envio de mensagem...");
+    this.hasUserInteracted = true; // Marca que o usuário interagiu
     await this.reiniciarSessao();
 
     let textoParaEnviar = this.mensagem.trim();
     let fromVoiceTranscript = false;
-    console.log('📤 [MSG] Texto do input:', textoParaEnviar || '(vazio)');
+    console.log("📤 [MSG] Texto do input:", textoParaEnviar || "(vazio)");
 
     // Se não há texto no input, verifica se há uma mensagem de voz pendente
     if (!textoParaEnviar) {
       const lastVoiceMessage = this.getLastVoiceMessage();
-      console.log('📤 [MSG] Verificando mensagem de voz pendente:', !!lastVoiceMessage);
+      console.log(
+        "📤 [MSG] Verificando mensagem de voz pendente:",
+        !!lastVoiceMessage
+      );
       if (lastVoiceMessage && lastVoiceMessage.transcript) {
         textoParaEnviar = lastVoiceMessage.transcript;
         fromVoiceTranscript = true;
-        console.log('📤 [MSG] Usando transcrição da voz (sem criar balão de texto):', textoParaEnviar);
+        console.log(
+          "📤 [MSG] Usando transcrição da voz (sem criar balão de texto):",
+          textoParaEnviar
+        );
       }
     }
 
     if (textoParaEnviar) {
-      console.log('📤 [MSG] Enviando texto:', textoParaEnviar);
-      const { displayMessage, socketPayload } = this.criarPayloadMensagem(textoParaEnviar);
+      console.log("📤 [MSG] Enviando texto:", textoParaEnviar);
+      const { displayMessage, socketPayload } =
+        this.criarPayloadMensagem(textoParaEnviar);
 
       if (fromVoiceTranscript) {
         // Se veio da voz, não cria novo balão; apenas envia
         this.enviarMensagemAoSocket(socketPayload);
-        console.log('📤 [MSG] Enviado ao socket sem criar balão (origem: voz)');
+        console.log("📤 [MSG] Enviado ao socket sem criar balão (origem: voz)");
       } else {
         // Fluxo normal digitado: cria balão
         this.conversaSala.push(displayMessage);
@@ -1051,10 +1201,10 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.disablePreviousBTButtons();
         this.roleConversaParaFinal();
         this.enviarMensagemAoSocket(socketPayload);
-        console.log('📤 [MSG] Mensagem enviada para o socket');
+        console.log("📤 [MSG] Mensagem enviada para o socket");
       }
     } else {
-      console.log('📤 [MSG] Nada para enviar (sem texto nem voz pendente)');
+      console.log("📤 [MSG] Nada para enviar (sem texto nem voz pendente)");
     }
   }
 
@@ -1160,20 +1310,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     const textoSanitizado = this.sanitizeInputField(texto);
     const dataHora = this.formatarDataIsoParaBR(new Date().toISOString());
     const id = uuidv4();
-    let afiCodigo = "";
-    if (this.clientKey === "C7VY7HCVF47H3F4") {
-      afiCodigo = "SOCZA001";
-    } else if (this.clientKey === "49fa27aab4f70b8eaacf") {
-      afiCodigo = "DETAL001";
-    } else if (this.clientKey === "5237XCA0IU2VAR2D12BN") {
-      afiCodigo = "IFCMT001";
-    } else if (this.clientKey === "938VF4YU8HVU8HVF4U8H") {
-      afiCodigo = "IFCMT001";
-    } else if (this.clientKey === "954GBBG4NY73VF478VB5") {
-      afiCodigo = "MANZO001";
-    } else {
-      afiCodigo = this.salaPrincipal.afiCodigo || "SOCZA001";
-    }
+    const afiCodigo = "DETAL001";
 
     const socketPayload = {
       id,
@@ -1205,7 +1342,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     return { displayMessage, socketPayload };
   }
 
-  // --- AVALIAÇÃO E FEEDBACK ---
+  // ========================================
+  // MÉTODOS PÚBLICOS - Avaliação e Feedback
+  // ========================================
 
   /**
    * Envia a avaliação de satisfação (estrelas) para o servidor.
@@ -1309,7 +1448,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     return this.ratingDisabled[messageId] === true;
   }
 
-  // --- MÉTODOS AUXILIARES E UTILITÁRIOS ---
+  // ========================================
+  // MÉTODOS PRIVADOS - Auxiliares e Utilitários
+  // ========================================
 
   /**
    * Verifica se uma mensagem recebida deve ser ignorada (ex: ecos de mensagens do próprio usuário).
@@ -1697,6 +1838,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
    * @param botao O botão selecionado.
    */
   selecaoBotao(msgContexto: any, botao: any): void {
+    this.hasUserInteracted = true; // Marca que o usuário interagiu
     const texto = botao.label || "";
     if (!texto) return;
 
@@ -1723,6 +1865,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
    * @param botao O item selecionado.
    */
   selecaoItem(msgContexto: any, botao: any): void {
+    this.hasUserInteracted = true; // Marca que o usuário interagiu
     const texto = botao.title || "";
     if (!texto) return;
 
@@ -1749,6 +1892,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
    * @param botao O link selecionado.
    */
   selecaoLinkReply(msgContexto: any, botao: any): void {
+    this.hasUserInteracted = true; // Marca que o usuário interagiu
     const texto = botao.label || "";
     if (!texto) return;
 
@@ -1801,9 +1945,9 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     window.parent.postMessage({ action: "closeChat" }, "*");
   }
 
-  // -----------------------------------------------
-  // Upload
-  // -----------------------------------------------
+  // ========================================
+  // MÉTODOS PÚBLICOS - Upload de Arquivos
+  // ========================================
 
   toggleUploadMenu(): void {
     this.showUploadMenu = !this.showUploadMenu;
@@ -1986,6 +2130,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   }
 
   async confirmUploadFromModal(): Promise<void> {
+    this.hasUserInteracted = true; // Marca interação via upload
     if (!this.uploadModalType || !this.selectedUploadFile) return;
     const protocoloArquivos = this.salaPrincipal?.ombProtocolo;
     if (!protocoloArquivos) {
@@ -2117,21 +2262,8 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   ): Promise<void> {
     const dataHora = this.formatarDataIsoParaBR(new Date().toISOString());
     const id = uuidv4();
-    let afiCodigo = "";
-    if (this.clientKey === "C7VY7HCVF47H3F4") {
-      afiCodigo = "SOCZA001";
-    } else if (this.clientKey === "49fa27aab4f70b8eaacf") {
-      afiCodigo = "DETAL001";
-    } else if (this.clientKey === "5237XCA0IU2VAR2D12BN") {
-      afiCodigo = "IFCMT001";
-    } else if (this.clientKey === "938VF4YU8HVU8HVF4U8H") {
-      afiCodigo = "IFCMT001";
-    } else if (this.clientKey === "954GBBG4NY73VF478VB5") {
-      afiCodigo = "MANZO001";
-    } else {
-      afiCodigo = this.salaPrincipal.afiCodigo || "SOCZA001";
-    }
-    
+    const afiCodigo = "DETAL001";
+
     const displayMessage: any = {
       olmId: id,
       olmStatus: "P",
@@ -2271,6 +2403,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     }, 100);
   }
   async confirmAndUploadImage(modalRef: any) {
+    this.hasUserInteracted = true; // Marca interação via upload
     if (!this.selectedUploadFile || this.uploadInProgress) return;
     const validationError = this.validateFile(
       this.selectedUploadFile,
@@ -2309,6 +2442,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
   async confirmAndUploadDocument(modalRef: any) {
+    this.hasUserInteracted = true; // Marca interação via upload
     if (!this.selectedUploadFile || this.uploadInProgress) return;
     const validationError = this.validateFile(
       this.selectedUploadFile,
@@ -2347,6 +2481,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
     }
   }
   async confirmAndUploadVideo(modalRef: any) {
+    this.hasUserInteracted = true; // Marca interação via upload
     if (!this.selectedUploadFile || this.uploadInProgress) return;
     const validationError = this.validateFile(
       this.selectedUploadFile,

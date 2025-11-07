@@ -11,36 +11,53 @@
        ======================================== -->
   <div class="chat-header">
     <div class="icon">
-      <img *ngIf="clientKey == 'C7VY7HCVF47H3F4'" src="https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/marIA.png" alt="">
-      <img *ngIf="clientKey == '49fa27aab4f70b8eaacf'" [src]="'https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/lisi.png?cb=' + cacheBuster" alt="">
-      <img *ngIf="clientKey == '5237XCA0IU2VAR2D12BN'" src="https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/ana-clara-avatar.png" alt="">
-      <img *ngIf="clientKey == '938VF4YU8HVU8HVF4U8H'" src="https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/ana-clara-avatar.png" alt="">
-      <img *ngIf="clientKey == '954GBBG4NY73VF478VB5'" src="https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/manzzo-avatar.png" alt="">
-      <!-- <img *ngIf="clientKey == '49fa27aab4f70b8eaacf'" [src]="'https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/lisi.png?cb=' + cacheBuster" alt=""> -->
+      <img [src]="'https://sociiz-public-bucket.s3.us-east-1.amazonaws.com/lisi.png?cb=' + cacheBuster" alt="">
     </div>
     <!-- Painel de configuração Lisi -->
-    <div *ngIf="lisiConfigPanelOpen && clientKey == '49fa27aab4f70b8eaacf'" class="lisi-config-panel">
+    <div *ngIf="lisiConfigPanelOpen" class="lisi-config-panel">
       <!-- <div class="lisi-config-header">
         <h3 class="lisi-config-title">Configurações</h3>
       </div> -->
       <div class="lisi-config-body">
         <div class="lisi-config-option">
+          <span class="option-label">Leitura de texto (TTS)</span>
           <label class="switch">
             <input type="checkbox" [ngModel]="lisiConfig.tts" (ngModelChange)="updateLisiConfig('tts', $event)"><span class="slider"></span>
           </label>
-          <span class="option-label">Leitura de texto (TTS)</span>
         </div>
         <div class="lisi-config-option">
+          <span class="option-label">Fala para texto (STT)</span>
           <label class="switch">
             <input type="checkbox" [ngModel]="lisiConfig.stt" (ngModelChange)="updateLisiConfig('stt', $event)"><span class="slider"></span>
           </label>
-          <span class="option-label">Fala para texto (STT)</span>
         </div>
       <div class="lisi-config-option">
+        <span class="option-label">Modo escuro</span>
         <label class="switch">
           <input type="checkbox" [ngModel]="lisiConfig.darkMode" (ngModelChange)="updateLisiConfig('darkMode', $event)"><span class="slider"></span>
         </label>
-        <span class="option-label">Modo escuro</span>
+      </div>
+      <div class="lisi-config-option font-size-option">
+        <div class="font-size-container">
+          <span class="option-label">Tamanho da fonte</span>
+          <div class="font-size-control">
+            <span class="font-size-value">{{ lisiConfig.fontSize | number:'1.1-1' }}x</span>
+            <input
+              type="range"
+              min="0.8"
+              max="1.5"
+              step="0.1"
+              [ngModel]="lisiConfig.fontSize"
+              (ngModelChange)="updateLisiConfig('fontSize', $event)"
+              class="font-size-slider">
+          </div>
+        </div>
+      </div>
+      <div class="lisi-config-option">
+        <span class="option-label">TTS automático</span>
+        <label class="switch">
+          <input type="checkbox" [ngModel]="lisiConfig.autoTts" (ngModelChange)="updateLisiConfig('autoTts', $event)"><span class="slider"></span>
+        </label>
       </div>
         <!-- <div class="lisi-config-option">
           <label class="switch">
@@ -64,17 +81,12 @@
     </div>
     
     <div class="nome">
-      <h1 *ngIf="clientKey == 'C7VY7HCVF47H3F4'">MarIA</h1>
-      <h1 *ngIf="clientKey == '49fa27aab4f70b8eaacf'">Lisi</h1>
-      <h1 *ngIf="clientKey == '5237XCA0IU2VAR2D12BN'">Ana Clara</h1>
-      <h1 *ngIf="clientKey == '938VF4YU8HVU8HVF4U8H'">Ana Clara</h1>
-      <h1 *ngIf="clientKey == '954GBBG4NY73VF478VB5'">Chef B</h1>
+      <h1>Lisi</h1>
       <p>Online</p>
     </div>
     
     <div class="buttons-container">
       <button
-        *ngIf="clientKey == '49fa27aab4f70b8eaacf'"
         class="config-btn"
         (click)="toggleLisiConfigPanel()"
         aria-label="Configurações"
@@ -119,7 +131,7 @@
          ======================================== -->
     <ng-container *ngIf="!estaEsperandoAtendimento">
       <!-- Janela de scroll das mensagens -->
-      <div class="chat-window" #scrollRef (mousemove)="onChatWindowMouseMove($event)" (mouseleave)="onChatWindowMouseLeave()">
+      <div class="chat-window" #scrollRef (mouseenter)="onChatWindowMouseMove($event)" (mouseleave)="onChatWindowMouseLeave()">
         
         <!-- ========================================
              LOOP DE MENSAGENS
@@ -146,17 +158,11 @@
               <ng-container>
                 <ng-container *ngIf="msg.olmTipo === 'US'">Você:</ng-container>
                 <ng-container *ngIf="msg.olmTipo === 'AT'">Atendente</ng-container>
-                <ng-container *ngIf="msg.olmTipo === 'IA' || msg.olmTipo === 'AI' || msg.olmTipo === 'BT'">
-                  <ng-container *ngIf="clientKey == 'C7VY7HCVF47H3F4'">MarIA</ng-container>
-                  <ng-container *ngIf="clientKey == '49fa27aab4f70b8eaacf'">Lisi</ng-container>
-                  <ng-container *ngIf="clientKey == '5237XCA0IU2VAR2D12BN'">Ana Clara</ng-container>
-                  <ng-container *ngIf="clientKey == '938VF4YU8HVU8HVF4U8H'">Ana Clara</ng-container>
-                  <ng-container *ngIf="clientKey == '954GBBG4NY73VF478VB5'">Chef B</ng-container>
-                </ng-container>
+                <ng-container *ngIf="msg.olmTipo === 'IA' || msg.olmTipo === 'AI' || msg.olmTipo === 'BT'">Lisi</ng-container>
               </ng-container>
               <!-- Botão TTS (Leitura de Texto) -->
               <button
-                *ngIf="msg.olmTipo !== 'US' && lisiConfig.tts && clientKey == '49fa27aab4f70b8eaacf'"
+                *ngIf="msg.olmTipo !== 'US' && lisiConfig.tts"
                 class="tts-play-btn"
                 (click)="speechSynthesisService.toggleTtsMessage(msg, lisiConfig.tts, clientKey)"
                 type="button"
@@ -535,15 +541,15 @@
         <!-- Botão único dinâmico -->
         <button
           class="chat-send-msg-btn"
-          [class.chat-stt-btn]="!mensagem.trim() && lisiConfig.stt && clientKey == '49fa27aab4f70b8eaacf' && !hasPendingVoiceMessage()"
+          [class.chat-stt-btn]="!mensagem.trim() && lisiConfig.stt && !hasPendingVoiceMessage()"
           [class.recording]="isRecording"
-          (click)="(!mensagem.trim() && lisiConfig.stt && clientKey == '49fa27aab4f70b8eaacf' && !hasPendingVoiceMessage()) ? toggleSttRecording() : enviarMensagem()"
-          [disabled]="!(mensagem.trim() || hasPendingVoiceMessage() || (!mensagem.trim() && lisiConfig.stt && clientKey == '49fa27aab4f70b8eaacf' && !hasPendingVoiceMessage())) || isSendingMessage || isInputBlocked"
-          [title]="(!mensagem.trim() && lisiConfig.stt && clientKey == '49fa27aab4f70b8eaacf' && !hasPendingVoiceMessage()) ? 'Gravar áudio' : 'Enviar mensagem'"
+          (click)="(!mensagem.trim() && lisiConfig.stt && !hasPendingVoiceMessage()) ? toggleSttRecording() : enviarMensagem()"
+          [disabled]="!(mensagem.trim() || hasPendingVoiceMessage() || (!mensagem.trim() && lisiConfig.stt && !hasPendingVoiceMessage())) || isSendingMessage || isInputBlocked"
+          [title]="(!mensagem.trim() && lisiConfig.stt && !hasPendingVoiceMessage()) ? 'Gravar áudio' : 'Enviar mensagem'"
           type="button">
 
           <!-- Estado: Microfone (input vazio, STT ativado, sem voz pendente) -->
-          <ng-container *ngIf="!mensagem.trim() && lisiConfig.stt && clientKey == '49fa27aab4f70b8eaacf' && !hasPendingVoiceMessage()">
+          <ng-container *ngIf="!mensagem.trim() && lisiConfig.stt && !hasPendingVoiceMessage()">
             <!-- Ícone de microfone (normal) -->
             <svg *ngIf="!isRecording && !isSendingMessage" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/>
@@ -557,7 +563,7 @@
           </ng-container>
 
           <!-- Estado: Enviar (texto presente OU voz pendente) -->
-          <ng-container *ngIf="mensagem.trim() || hasPendingVoiceMessage() || !(lisiConfig.stt && clientKey == '49fa27aab4f70b8eaacf')">
+          <ng-container *ngIf="mensagem.trim() || hasPendingVoiceMessage() || !lisiConfig.stt">
             <img *ngIf="!isSendingMessage" src="assets/icons/chat--send.svg" alt="">
           </ng-container>
 
